@@ -9,11 +9,14 @@ from keras.preprocessing.image import Iterator
 from keras.utils.np_utils import to_categorical
 import keras.backend as K
 
+from pdf2image import convert_from_path
 
 def angle_difference(x, y):
     """
     Calculate minimum difference between two angles.
     """
+    # x = K.print_tensor(x, message='x = ')
+    # y = K.print_tensor(y, message='y = ')
     return 180 - abs(abs(x - y) - 180)
 
 
@@ -23,6 +26,8 @@ def angle_error(y_true, y_pred):
     and the predicted angles. Each angle is represented
     as a binary vector.
     """
+    # y_true = K.print_tensor(y_true, message='y_true = ')
+    # y_pred = K.print_tensor(y_pred, message='y_pred = ')
     diff = angle_difference(K.argmax(y_true), K.argmax(y_pred))
     return K.mean(K.cast(K.abs(diff), K.floatx()))
 
@@ -282,6 +287,8 @@ class RotNetDataGenerator(Iterator):
             if self.rotate:
                 # get a random angle
                 rotation_angle = np.random.randint(360)
+                # random_coeff = np.random.randint(0,4)       # for 4 classes
+                # rotation_angle = random_coeff * 90          # for 4 classes
             else:
                 rotation_angle = 0
 
@@ -301,12 +308,15 @@ class RotNetDataGenerator(Iterator):
             # store the image and label in their corresponding batches
             batch_x[i] = rotated_image
             batch_y[i] = rotation_angle
+            # batch_y[i] = rotation_angle / 90
 
         if self.one_hot:
             # convert the numerical labels to binary labels
             batch_y = to_categorical(batch_y, 360)
+            # batch_y = to_categorical(batch_y, 4)          # for 4 classes
         else:
             batch_y /= 360
+            # batch_y /= 4                                  # for 4 classes
 
         # preprocess input images
         if self.preprocess_func:
@@ -353,6 +363,7 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
     y = []
     for image in images:
         rotation_angle = np.random.randint(360)
+        # rotation_angle = np.random.randint(0,4) * 90
         rotated_image = generate_rotated_image(
             image,
             rotation_angle,
@@ -362,6 +373,7 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
         )
         x.append(rotated_image)
         y.append(rotation_angle)
+        # y.append(rotation_angle/90)
 
     x = np.asarray(x, dtype='float32')
     y = np.asarray(y, dtype='float32')
@@ -370,6 +382,7 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
         x = np.expand_dims(x, axis=3)
 
     y = to_categorical(y, 360)
+    # y = to_categorical(y, 4)
 
     x_rot = np.copy(x)
 
@@ -388,11 +401,13 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
 
     fig_number = 0
     for rotated_image, true_angle, predicted_angle in zip(x_rot, y, y_pred):
+    # for rotated_image, true_angle, predicted_angle in zip(x_rot, y*90, y_pred*90):
         original_image = rotate(rotated_image, -true_angle)
         if crop_largest_rect:
             original_image = crop_largest_rectangle(original_image, -true_angle, *size)
 
-        corrected_image = rotate(rotated_image, -predicted_angle)
+        # corrected_image = rotate(rotated_image, -predicted_angle)
+        corrected_image = rotate(original_image, predicted_angle)
         if crop_largest_rect:
             corrected_image = crop_largest_rectangle(corrected_image, -predicted_angle, *size)
 
@@ -424,10 +439,13 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
         fig_number += 1
         ax = plt.subplot(num_images, 3, fig_number)
         corrected_angle = angle_difference(predicted_angle, true_angle)
+        # corrected_angle = K.eval(angle_difference(true_angle, predicted_angle))
+        # print(corrected_angle)
         if fig_number == 3:
             plt.title('Corrected\n', fontdict=title_fontdict)
         ax.text(
-            0.5, 1.03, 'Angle: {0}'.format(corrected_angle),
+            # 0.5, 1.03, 'Angle: {0}'.format(corrected_angle),
+            0.5, 1.03, 'Angle: {0}'.format(predicted_angle),
             horizontalalignment='center',
             transform=ax.transAxes,
             fontsize=11
@@ -439,3 +457,15 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
 
     if save_path:
         plt.savefig(save_path)
+
+
+def convert_to_jpg(filenames, dpi=500):
+    """
+    Given documents of type PDF, convert the files into JPGs.
+    """
+
+    for filename in filenames:
+        pages = convert_from_path(filename, dpi=dpi)
+
+        for index, page in enumerate(pages):
+            page.save(filename + '-' + str(index+1) + '.jpg', 'JPEG')

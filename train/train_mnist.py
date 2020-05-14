@@ -14,6 +14,9 @@ from utils import angle_error, RotNetDataGenerator, binarize_images
 # we don't need the labels indicating the digit value, so we only load the images
 (X_train, _), (X_test, _) = mnist.load_data()
 
+print(X_train.shape)
+print(X_test.shape)
+
 model_name = 'rotnet_mnist'
 
 # number of convolutional filters to use
